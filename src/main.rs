@@ -2,22 +2,23 @@ use std::env;
 use std::io::{self, Read, Write};
 
 // Define the memory layout
-// Cell 0: Carry Flag
-// Cell 1: Zero Flag
-// Cell 2: Sign Flag
-// Cell 3: General Purpose Register (GPR)
-// Cell 4: Input/Output Register (I/O)
-// Cell 5: Stack Pointer (SP)
-// Cell 6: Program Counter (PC)
-// Cell 7: Status Register (SR)
-// Cell 8: Instruction Register (IR)
-// Cell 9: Base Pointer (BP)
-// Cell 10: Flags Register (FR)
-// Cell 11: Return Address Register (RAR)
-// Cell 12: Compare Register (CR)
-// Cell 13: TEMP Register 0
-// Cell 14: TEMP Register 1
-// Cell 15: TEMP Register 2
+
+// Cell 0: Zero Flag
+// Cell 1: Sign Flag
+// Cell 2: General Purpose Register (GPR)
+// Cell 3: Input/Output Register (I/O)
+// Cell 4: Stack Pointer (SP)
+// Cell 5: Program Counter (PC)
+// Cell 6: Status Register (SR)
+// Cell 7: Instruction Register (IR)
+// Cell 8: Base Pointer (BP)
+// Cell 9: Flags Register (FR)
+// Cell 10: Return Address Register (RAR)
+// Cell 11: Compare Register (CR)
+// Cell 12: TEMP Register 0
+// Cell 13: TEMP Register 1
+// Cell 14: TEMP Register 2
+// Cell 15: TEMP Register 3
 
 const DEFAULT_MEMORY_SIZE: usize = 65536;
 const USER_DATA_START: usize = 16;
@@ -38,6 +39,7 @@ const REG_CR: usize = 12;
 const REG_TEMP0: usize = 13;
 const REG_TEMP1: usize = 14;
 const REG_TEMP2: usize = 15;
+
 // Status Register Flags
 const SR_OVERFLOW: u8 = 1 << 0;
 const SR_UNDERFLOW: u8 = 1 << 1;
@@ -154,19 +156,31 @@ fn execute(program: &str, memory_size: usize) {
                 // Addition with Carry
                 let (result, overflow) = memory[ptr].overflowing_add(memory[ptr.wrapping_add(1)]);
                 memory[ptr] = result;
-                memory[REG_CARRY] = if overflow { 1 } else { 0 };
+                if overflow {
+                    memory[REG_SR] |= SR_OVERFLOW;
+                } else {
+                    memory[REG_SR] &= !SR_OVERFLOW; // Clear the overflow flag if not overflowed
+                }
             }
             b'M' => {
-                // Multiplication with Carry
+                // Multiplication with Overflow
                 let (result, overflow) = memory[ptr].overflowing_mul(memory[ptr.wrapping_add(1)]);
                 memory[ptr] = result;
-                memory[REG_CARRY] = if overflow { 1 } else { 0 };
+                if overflow {
+                    memory[REG_SR] |= SR_OVERFLOW;
+                } else {
+                    memory[REG_SR] &= !SR_OVERFLOW; // Clear the overflow flag if not overflowed
+                }
             }
             b'S' => {
-                // Subtraction with Borrow
+                // Subtraction with Underflow
                 let (result, overflow) = memory[ptr].overflowing_sub(memory[ptr.wrapping_add(1)]);
                 memory[ptr] = result;
-                memory[REG_CARRY] = if overflow { 1 } else { 0 };
+                if overflow {
+                    memory[REG_SR] |= SR_OVERFLOW;
+                } else {
+                    memory[REG_SR] &= !SR_OVERFLOW; // Clear the overflow flag if not overflowed
+                }
             }
             b'D' => {
                 // Division with Remainder
@@ -175,7 +189,7 @@ fn execute(program: &str, memory_size: usize) {
                     let quotient = memory[ptr] / divisor;
                     let remainder = memory[ptr] % divisor;
                     memory[ptr] = quotient;
-                    memory[ptr.wrapping_add(1)] = remainder; // Make sure this is the intended logic.
+                    memory[ptr.wrapping_add(1)] = remainder; // Store the remainder in the next cell
                 } else {
                     memory[REG_SR] |= SR_DIVIDE_BY_ZERO;
                 }
