@@ -71,12 +71,12 @@ fn main() {
                 if let Some(m) = args_iter.next() {
                     memory_size = m.parse().unwrap_or(65536);
                 }
-            },
+            }
             "-p" => {
                 if let Some(p) = args_iter.next() {
                     program_source = Some(p.clone());
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -85,16 +85,17 @@ fn main() {
         Some(prog) => prog,
         None => {
             let mut buffer = String::new();
-            io::stdin().read_to_string(&mut buffer)
-                       .expect("Failed to read program from stdin");
+            io::stdin()
+                .read_to_string(&mut buffer)
+                .expect("Failed to read program from stdin");
             buffer
-        },
+        }
     };
 
     // Use `memory_size` and `program` as needed
     println!("Memory Size: {} bytes", memory_size);
     println!("Program: {}", program);
-    
+
     execute(&program, memory_size);
 }
 
@@ -238,43 +239,49 @@ fn execute(program: &str, memory_size: usize) {
             b'!' => {
                 // Negation
                 memory[ptr] = !memory[ptr];
-            },
+            }
 
             // Control flow operations
-            
             b'J' | b'C' => {
                 // Find the end of the current instruction based on a space or newline
                 let remaining_program = &program[pc..];
-                let end_of_instruction = remaining_program.find(' ')
-                                        .or_else(|| remaining_program.find('\n'))
-                                        .unwrap_or(remaining_program.len());
-                
+                let end_of_instruction = remaining_program
+                    .find(' ')
+                    .or_else(|| remaining_program.find('\n'))
+                    .unwrap_or(remaining_program.len());
+
                 let instruction = &remaining_program[..end_of_instruction];
-                let label_name = instruction.split_whitespace().nth(1).unwrap().trim_start_matches('*');
-                
+                let label_name = instruction
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap()
+                    .trim_start_matches('*');
+
                 if let Some(&address) = labels.get(label_name) {
                     if ir == b'J' {
                         pc = address; // For 'J', jump to the address
                     } else {
-                        // For 'C', call subroutine (example simplified logic)
-                        // Push return address to stack (not shown here)
-                        // Then jump to the subroutine's starting address
-                        pc = address;
+                        // Calculate the address of the next instruction after 'C'
+                        let return_address = pc + end_of_instruction + 1; // Might need adjustment based on how instructions are separated
+                        push_to_stack(&mut memory, &mut sp, return_address); // Ensure this pushes `usize`
+                        pc = address; // Jump to the subroutine's starting address
+                        continue; // Skip the automatic pc increment
                     }
                     continue; // Skip the automatic pc increment at the end of the loop
                 } else {
                     println!("Label '{}' not found.", label_name);
                     // Handle error, potentially halting execution
                 }
-            },
+            }
             b'R' => {
                 // Return from subroutine
                 pc = pop_from_stack(&mut memory, &mut sp);
             }
-            b';' => { // End-of-sequence opcode
+            b';' => {
+                // End-of-sequence opcode
                 println!("End of program sequence reached.");
                 break; // Exit the execution loop
-            },
+            }
 
             _ => {} // Ignore any other characters
         }
@@ -282,24 +289,28 @@ fn execute(program: &str, memory_size: usize) {
     }
 }
 
-fn push_to_stack(memory: &mut Vec<u8>, sp: &mut usize, value: u8) {
-    if *sp == 0 {
-        panic!("Stack overflow");
+fn push_to_stack(memory: &mut Vec<u8>, sp: &mut usize, value: usize) {
+    // 32-bit LSB-first representation
+    for i in 0..4 {
+        let byte = ((value >> (8 * i)) & 0xFF) as u8;
+        if *sp == 0 {
+            panic!("Stack overflow");
+        }
+        *sp -= 1;
+        memory[*sp] = byte;
     }
-    *sp -= 1; // Decrement SP first to get to a valid index
-    memory[*sp] = value; // Use SP to index into memory and store value
 }
 
 fn pop_from_stack(memory: &mut Vec<u8>, sp: &mut usize) -> usize {
-    // Assuming addresses are stored in a larger format (e.g., two bytes)
-    // This is a simplified example; adjust according to how you're storing addresses
-    if *sp >= memory.len() - 2 {
+    if *sp > memory.len() - 4 {
         panic!("Stack underflow");
     }
-    let high_byte = memory[*sp] as usize;
-    let low_byte = memory[*sp + 1] as usize;
-    *sp += 2; // Adjust based on the size of addresses in your stack
-    (high_byte << 8) | low_byte
+    let mut value = 0usize;
+    for i in 0..4 {
+        value |= (memory[*sp + i] as usize) << (8 * i);
+    }
+    *sp += 4;
+    value
 }
 
 fn resolve_address(labels: &HashMap<String, usize>, label: &str) -> usize {
@@ -320,4 +331,3 @@ fn parse_labels(program: &str) -> HashMap<String, usize> {
 
     labels
 }
-
