@@ -73,6 +73,12 @@ To directly pass a Brainshift program as a command-line argument:
 ./target/release/brainshift "+[----->+++<]>."
 ```
 
+Print "Hello World!"
+
+./target/release/brainshift "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>."
+
+Hello World!
+
 This will execute the provided Brainfuck/Brainshift code.
 
 ## Contributing
