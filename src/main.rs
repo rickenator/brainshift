@@ -45,9 +45,9 @@ const REG_TEMP3: usize = 15;
 const SR_OVERFLOW: u8 = 1 << 0;
 const SR_UNDERFLOW: u8 = 1 << 1;
 const SR_DIVIDE_BY_ZERO: u8 = 1 << 2;
-const SR_INVALID_INSTRUCTION: u8 = 1 << 3;
-const SR_INVALID_MEMORY_ACCESS: u8 = 1 << 4;
-const SR_INVALID_MEMORY_ALIGNMENT: u8 = 1 << 5;
+const SR_ZERO_FLAG: u8 = 1 << 3;
+const SR_INVALID_INSTRUCTION: u8 = 1 << 4;
+const SR_INVALID_MEMORY_ACCESS: u8 = 1 << 5;
 const SR_INVALID_MEMORY_SIZE: u8 = 1 << 6;
 const SR_INVALID_MEMORY_RANGE: u8 = 1 << 7;
 
@@ -277,6 +277,65 @@ fn execute(program: &str, memory_size: usize) {
                 // Return from subroutine
                 pc = pop_from_stack(&mut memory, &mut sp);
             }
+            b'Z' => {
+                // Set Zero flag
+                memory[REG_SR] |= SR_ZERO_FLAG;
+            }
+            b'z' => {
+                // Clear Zero flag
+                memory[REG_SR] &= !SR_ZERO_FLAG;
+            }
+            b'j' => {
+                // Jump if Zero flag is set
+                if memory[REG_SR] & SR_ZERO_FLAG != 0 {
+                    let remaining_program = &program[pc..];
+                    let end_of_instruction = remaining_program
+                        .find(' ')
+                        .or_else(|| remaining_program.find('\n'))
+                        .unwrap_or(remaining_program.len());
+
+                    let instruction = &remaining_program[..end_of_instruction];
+                    let label_name = instruction
+                        .split_whitespace()
+                        .nth(1)
+                        .unwrap()
+                        .trim_start_matches('*');
+
+                    if let Some(&address) = labels.get(label_name) {
+                        pc = address; // Jump to the address
+                        continue; // Skip the automatic pc increment at the end of the loop
+                    } else {
+                        println!("Label '{}' not found.", label_name);
+                        // Handle error, potentially halting execution
+                    }
+                }
+            }
+            b'n' => {
+                // Jump if Zero flag is not set
+                if memory[REG_SR] & SR_ZERO_FLAG == 0 {
+                    let remaining_program = &program[pc..];
+                    let end_of_instruction = remaining_program
+                        .find(' ')
+                        .or_else(|| remaining_program.find('\n'))
+                        .unwrap_or(remaining_program.len());
+
+                    let instruction = &remaining_program[..end_of_instruction];
+                    let label_name = instruction
+                        .split_whitespace()
+                        .nth(1)
+                        .unwrap()
+                        .trim_start_matches('*');
+
+                    if let Some(&address) = labels.get(label_name) {
+                        pc = address; // Jump to the address
+                        continue; // Skip the automatic pc increment at the end of the loop
+                    } else {
+                        println!("Label '{}' not found.", label_name);
+                        // Handle error, potentially halting execution
+                    }
+                }
+            }
+
             b';' => {
                 // End-of-sequence opcode
                 println!("End of program sequence reached.");
