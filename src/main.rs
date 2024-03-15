@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::io::{self, Read, Write};
 
@@ -60,25 +61,41 @@ macro_rules! mem {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        eprintln!("Usage: brainshift <program> [memory size in bytes]");
-        std::process::exit(1);
+    let mut memory_size: usize = 65536; // Default memory size
+    let mut program_source: Option<String> = None;
+
+    let mut args_iter = args.iter().skip(1); // Skip the program name
+    while let Some(arg) = args_iter.next() {
+        match arg.as_str() {
+            "-m" => {
+                if let Some(m) = args_iter.next() {
+                    memory_size = m.parse().unwrap_or(65536);
+                }
+            },
+            "-p" => {
+                if let Some(p) = args_iter.next() {
+                    program_source = Some(p.clone());
+                }
+            },
+            _ => {}
+        }
     }
 
-    // Parse the optional memory size argument, defaulting to 64K if not specified
-    let memory_size = args
-        .get(2)
-        .and_then(|size| size.parse::<usize>().ok())
-        .unwrap_or(DEFAULT_MEMORY_SIZE);
+    let program = match program_source {
+        Some(prog) => prog,
+        None => {
+            let mut buffer = String::new();
+            io::stdin().read_to_string(&mut buffer)
+                       .expect("Failed to read program from stdin");
+            buffer
+        },
+    };
 
-    // Ensure the memory size is at least large enough to accommodate the system area
-    if memory_size < USER_DATA_START {
-        eprintln!("Memory size must be at least {}", USER_DATA_START);
-        std::process::exit(1);
-    }
-
-    let program = &args[1];
-    execute(program, memory_size);
+    // Use `memory_size` and `program` as needed
+    println!("Memory Size: {} bytes", memory_size);
+    println!("Program: {}", program);
+    
+    execute(&program, memory_size);
 }
 
 fn execute(program: &str, memory_size: usize) {
@@ -86,7 +103,13 @@ fn execute(program: &str, memory_size: usize) {
     let mut memory = vec![0u8; memory_size];
     let mut ptr = USER_DATA_START; // Adjusted to start after system area
     let mut pc = 0usize; // Adjusted to start after system area;
+    let mut sp = memory_size; // Adjusted to just beyond the top of the memory
     let mut input_buffer = Vec::new();
+    let labels = parse_labels(program);
+
+    // Initialize the stack pointer at the top of the memory
+    let stack_start = memory_size - 1;
+    memory[REG_SP] = stack_start as u8;
 
     while pc < program.len() {
         // Execute the current instruction
@@ -215,12 +238,86 @@ fn execute(program: &str, memory_size: usize) {
             b'!' => {
                 // Negation
                 memory[ptr] = !memory[ptr];
+            },
+
+            // Control flow operations
+            
+            b'J' | b'C' => {
+                // Find the end of the current instruction based on a space or newline
+                let remaining_program = &program[pc..];
+                let end_of_instruction = remaining_program.find(' ')
+                                        .or_else(|| remaining_program.find('\n'))
+                                        .unwrap_or(remaining_program.len());
+                
+                let instruction = &remaining_program[..end_of_instruction];
+                let label_name = instruction.split_whitespace().nth(1).unwrap().trim_start_matches('*');
+                
+                if let Some(&address) = labels.get(label_name) {
+                    if ir == b'J' {
+                        pc = address; // For 'J', jump to the address
+                    } else {
+                        // For 'C', call subroutine (example simplified logic)
+                        // Push return address to stack (not shown here)
+                        // Then jump to the subroutine's starting address
+                        pc = address;
+                    }
+                    continue; // Skip the automatic pc increment at the end of the loop
+                } else {
+                    println!("Label '{}' not found.", label_name);
+                    // Handle error, potentially halting execution
+                }
+            },
+            b'R' => {
+                // Return from subroutine
+                pc = pop_from_stack(&mut memory, &mut sp);
             }
-            
-            
+            b';' => { // End-of-sequence opcode
+                println!("End of program sequence reached.");
+                break; // Exit the execution loop
+            },
 
             _ => {} // Ignore any other characters
         }
         pc = pc.wrapping_add(1);
     }
 }
+
+fn push_to_stack(memory: &mut Vec<u8>, sp: &mut usize, value: u8) {
+    if *sp == 0 {
+        panic!("Stack overflow");
+    }
+    *sp -= 1; // Decrement SP first to get to a valid index
+    memory[*sp] = value; // Use SP to index into memory and store value
+}
+
+fn pop_from_stack(memory: &mut Vec<u8>, sp: &mut usize) -> usize {
+    // Assuming addresses are stored in a larger format (e.g., two bytes)
+    // This is a simplified example; adjust according to how you're storing addresses
+    if *sp >= memory.len() - 2 {
+        panic!("Stack underflow");
+    }
+    let high_byte = memory[*sp] as usize;
+    let low_byte = memory[*sp + 1] as usize;
+    *sp += 2; // Adjust based on the size of addresses in your stack
+    (high_byte << 8) | low_byte
+}
+
+fn resolve_address(labels: &HashMap<String, usize>, label: &str) -> usize {
+    *labels.get(label).expect("Label not found")
+}
+
+fn parse_labels(program: &str) -> HashMap<String, usize> {
+    let mut labels = HashMap::new();
+    let mut address = 0;
+
+    for line in program.lines() {
+        if let Some((label, _)) = line.split_once(':') {
+            labels.insert(label.trim().to_string(), address);
+        } else {
+            address += line.len(); // Adjust how addresses are calculated based on your needs
+        }
+    }
+
+    labels
+}
+
