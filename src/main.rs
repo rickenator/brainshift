@@ -23,22 +23,22 @@ use std::io::{self, Read, Write};
 const DEFAULT_MEMORY_SIZE: usize = 65536;
 const USER_DATA_START: usize = 16;
 const REGISTERS: usize = 16;
-const REG_CARRY: usize = 0;
-const REG_ZERO: usize = 1;
-const REG_SIGN: usize = 2;
-const REG_GPR: usize = 3;
-const REG_IO: usize = 4;
-const REG_SP: usize = 5;
-const REG_PC: usize = 6;
-const REG_SR: usize = 7;
-const REG_IR: usize = 8;
-const REG_BP: usize = 9;
-const REG_FR: usize = 10;
-const REG_RAR: usize = 11;
-const REG_CR: usize = 12;
-const REG_TEMP0: usize = 13;
-const REG_TEMP1: usize = 14;
-const REG_TEMP2: usize = 15;
+const REG_ZERO: usize = 0;
+const REG_SIGN: usize = 1;
+const REG_GPR: usize = 2;
+const REG_IO: usize = 3;
+const REG_SP: usize = 4;
+const REG_PC: usize = 5;
+const REG_SR: usize = 6;
+const REG_IR: usize = 7;
+const REG_BP: usize = 8;
+const REG_FR: usize = 9;
+const REG_RAR: usize = 10;
+const REG_CR: usize = 11;
+const REG_TEMP0: usize = 12;
+const REG_TEMP1: usize = 13;
+const REG_TEMP2: usize = 14;
+const REG_TEMP3: usize = 15;
 
 // Status Register Flags
 const SR_OVERFLOW: u8 = 1 << 0;
@@ -135,20 +135,32 @@ fn execute(program: &str, memory_size: usize) {
                     }
                 }
             }
+
+            // BrainShift extensions
+            b'0' => {
+                memory[ptr] = 0;
+            }
             b'&' => {
+                // Logical AND
                 memory[ptr] &= memory[ptr.wrapping_add(1)];
             }
             b'|' => {
+                // Logical OR
                 memory[ptr] |= memory[ptr.wrapping_add(1)];
             }
             b'^' => {
+                // Logical XOR
                 memory[ptr] ^= memory[ptr.wrapping_add(1)];
             }
             b'~' => {
+                // Logical NOT
                 memory[ptr] = !memory[ptr];
             }
             b'#' => {
                 memory[ptr] >>= 1; // Right bit shift
+            }
+            b'@' => {
+                memory[ptr] <<= 1; // Left bit shift
             }
 
             // Arithmetic operations
@@ -201,25 +213,11 @@ fn execute(program: &str, memory_size: usize) {
                 }
             }
             b'!' => {
-                // Logical NOT
+                // Negation
                 memory[ptr] = !memory[ptr];
             }
-            b'?' => {
-                // Logical AND
-                memory[ptr] &= memory[ptr.wrapping_add(1)];
-            }
-            b':' => {
-                // Logical OR
-                memory[ptr] |= memory[ptr.wrapping_add(1)];
-            }
-            b'=' => {
-                // Logical XOR
-                memory[ptr] ^= memory[ptr.wrapping_add(1)];
-            }
-            b'@' => {
-                // Logical Shift Left
-                memory[ptr] <<= 1;
-            }
+            
+            
 
             _ => {} // Ignore any other characters
         }
