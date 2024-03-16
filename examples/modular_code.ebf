@@ -1,0 +1,9 @@
++++++ +++++    "Cell 0 = 10"
+> ++           "Cell 1 = 2"
+<              "Go back to Cell 0"
+[->-[>+>>]>[+[-<+>]>+>>]<<<<<<] "Divide Cell 0 by Cell 1, remainder in Cell 0"
+>              "Move to Cell 1"
+[              "Start of loop to clean up Cell 1"
+    -          "Clear Cell 1"
+]
+<.             "Move to Cell 0 and print the remainder (should be '0')"

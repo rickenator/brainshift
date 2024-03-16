@@ -1,0 +1,8 @@
++++++   "Cell 0 = 5"
+[       "Start of loop"
+    -   "Decrement the cell"
+    Z   "Set the Zero flag if the cell is 0"
+    j*loopEnd "Jump to loopEnd if Zero flag is set"
+]
+*loopEnd
+.       "Print the current cell value (should print '0')"

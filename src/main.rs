@@ -95,6 +95,9 @@ fn main() {
     // Use `memory_size` and `program` as needed
     println!("Memory Size: {} bytes", memory_size);
     println!("Program: {}", program);
+    
+    // Preprocess the program to remove comments
+    preprocess_program(&program);
 
     execute(&program, memory_size);
 }
@@ -161,6 +164,11 @@ fn execute(program: &str, memory_size: usize) {
             }
 
             // BrainShift extensions
+            b' ' | b'\t' | b'\n' => {
+                // Skip whitespace
+                pc += 1;
+                continue;
+            },
             b'0' => {
                 memory[ptr] = 0;
             }
@@ -389,4 +397,22 @@ fn parse_labels(program: &str) -> HashMap<String, usize> {
     }
 
     labels
+}
+
+// Preprocess the program to remove comments
+fn preprocess_program(program: &str) -> String {
+    let mut processed_program = String::new();
+    let mut in_comment = false;
+
+    for char in program.chars() {
+        if char == '"' {
+            in_comment = !in_comment; // Toggle comment mode
+            continue; // Skip the " character itself
+        }
+        if !in_comment {
+            processed_program.push(char); // Add characters outside of comments
+        }
+    }
+
+    processed_program
 }

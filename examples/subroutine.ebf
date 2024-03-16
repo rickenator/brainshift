@@ -1,0 +1,9 @@
+"Define a subroutine at the beginning"
+*inc
+    +   "Increment the current cell"
+    R   "Return from subroutine"
+
+"Main program starts here"
+-       "Ensure the cell is not zero initially for demonstration"
+C*inc   "Call the increment subroutine"
+.       "Print the current cell value (should print '1' if ASCII is used)"
